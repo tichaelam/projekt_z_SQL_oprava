@@ -94,7 +94,7 @@
 - Funkcí EXTRACT jsme vyloučili chybu ve výpočtu kvartálů u cen potravin.
 
 ### První a poslední srovnatelné období
-- U VO 2 je identifikace těchto období klíčové. Vybrala jsem tedy jako první období první kvartál prvního roku (2006 Q1) a jako poslední čtvrtý kvartál posledního roku (2018 Q4).
+- U VO 2 je identifikace těchto období klíčové. Vybrala jsem tedy jako první období první rok (2006) a jako poslední poslední rok (2018).
 
 ### Filtrace dat
 - V tabulce *economies* jsou ve sloupci *country* pomíchané jak regiony, tak státy, proto jsem musela vyfiltrovat seznam EU států na základě [údajů od Council of Europe](https://www.coe.int/en/web/portal/members-states).
