@@ -1,0 +1,104 @@
+-- VO 1 Rostou v průběhu let mzdy ve všech odvětvích, nebo v některých klesají?
+-- sloupec number_of_wage_declines urcuje, kolikrat v danem odvetvi mzdy mezirocne klesly
+-- neboli kolik let melo mzdu nizsi nez rok predchozi
+SELECT
+    industry_branch_name,
+    SUM(wage_decline_flag) AS number_of_wage_declines
+FROM (
+    SELECT
+        industry_branch_code,
+        industry_branch_name,
+        avg_wage_yearly_branch,
+        LAG(avg_wage_yearly_branch) OVER (PARTITION BY industry_branch_code ORDER BY year) AS prev_wage,
+        CASE
+            WHEN avg_wage_yearly_branch < LAG(avg_wage_yearly_branch) OVER (PARTITION BY industry_branch_code ORDER BY year)
+            THEN 1 ELSE 0
+        END AS wage_decline_flag
+    FROM data_academy_content.t_michaela_ticha_project_sql_primary_final
+) s
+GROUP BY industry_branch_name
+ORDER BY number_of_wage_declines DESC;
+
+-- VO 2 Kolik je možné si koupit litrů mléka a kilogramů chleba za první a poslední období?
+-- porovnavame roky 2006 a 2018
+-- sloupec wage znazornuje prumernou rocni mzdu v cele republice
+WITH bounds AS (
+    SELECT 
+        MIN(year) AS first_year, 
+        MAX(year) AS last_year
+    FROM data_academy_content.t_michaela_ticha_project_sql_primary_final
+),
+filtered AS (
+    SELECT
+        CASE 
+            WHEN category_code = 114201 THEN 'Milk'
+            WHEN category_code = 111301 THEN 'Bread'
+        END AS product,
+        year,
+        quarter,
+        AVG(avg_wage_yearly_overall) AS wage,
+        AVG(avg_price_yearly) AS price
+    FROM data_academy_content.t_michaela_ticha_project_sql_primary_final
+    WHERE category_code IN (114201, 111301)
+    GROUP BY product, year, quarter
+),
+final AS (
+    SELECT
+        product,
+        year,
+        quarter,
+        wage,
+        price,
+        ROUND(wage / price, 2) AS units_affordable
+    FROM filtered
+    CROSS JOIN bounds
+    WHERE 
+          (year = bounds.first_year AND quarter = 1)
+       OR (year = bounds.last_year  AND quarter = 4)
+)
+SELECT *
+FROM final
+ORDER BY product, year;
+
+-- VO 3 Která kategorie potravin zdražuje nejpomaleji?
+-- neboli, hledame nejnizsi dlouhodoby prumer yoy rustu
+-- ziskame potravinu s nejnizsim procentnim mezirocnim rustem, kde se yoy pocita z celorocnich prumeru
+SELECT
+    category_code,
+    category_name,
+    ROUND(AVG(price_yoy_percent), 2) AS avg_yearly_growth_percent
+FROM data_academy_content.t_michaela_ticha_project_sql_primary_final
+WHERE price_yoy_percent IS NOT NULL
+GROUP BY category_code, category_name
+ORDER BY avg_yearly_growth_percent ASC
+LIMIT 1;
+
+-- VO 4 Existuje rok, ve kterém byl meziroční nárůst cen potravin výrazně vyšší než růst mezd (větší než 10 %)?
+-- zde je vysledkem prazdna tabulka, tudiz data ukazuji, ze rust cen potravin o 10 % nenastal
+SELECT
+    year,
+    food_yoy_percent,
+    wage_yoy_percent
+FROM data_academy_content.t_michaela_ticha_project_sql_primary_final
+WHERE food_yoy_percent > 10
+  AND (wage_yoy_percent IS NULL OR wage_yoy_percent < food_yoy_percent)
+GROUP BY year, food_yoy_percent, wage_yoy_percent
+ORDER BY year;
+
+-- VO 5 Má výška HDP vliv na změny ve mzdách a cenách potravin? Neboli, pokud HDP vzroste výrazněji v jednom roce, projeví se to na cenách potravin či mzdách ve stejném nebo následujícím roce výraznějším růstem?
+-- avg_food_price_yearly = celkovy cenovy index pro dany rok, standardizovan napric kategoriemi pro jednodussi porovnani, avg_food_yoy_percent je pak mezirocni zmena tohoto indexu
+SELECT
+    p.year,
+    g.gdp,
+    g.population,
+    g.gini,
+    AVG(p.avg_food_price_yearly) AS avg_food_price_yearly,
+    AVG(p.food_yoy_percent) AS avg_food_yoy_percent,
+    AVG(p.avg_wage_yearly_overall) AS avg_wage_yearly_overall,
+    AVG(p.wage_yoy_percent) AS avg_wage_yoy_percent
+FROM data_academy_content.t_michaela_ticha_project_SQL_primary_final p
+JOIN data_academy_content.t_michaela_ticha_project_SQL_secondary_final g
+      ON g.year = p.year
+WHERE g.country = 'Czech Republic'
+GROUP BY p.year, g.gdp, g.population, g.gini
+ORDER BY p.year;
