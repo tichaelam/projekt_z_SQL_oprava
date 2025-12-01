@@ -1,19 +1,16 @@
 DROP TABLE IF EXISTS data_academy_content.t_michaela_ticha_project_sql_primary_final;
 
 CREATE TABLE data_academy_content.t_michaela_ticha_project_sql_primary_final AS
-WITH
-price_with_quarter AS (
+WITH price_with_quarter AS (
     SELECT
         category_code,
         value,
         region_code,
-        EXTRACT(YEAR FROM date_from)::int    AS year,
+        EXTRACT(YEAR FROM date_from)::int AS year,
         EXTRACT(QUARTER FROM date_from)::int AS quarter
     FROM czechia_price
-    WHERE date_from IS NOT NULL
-      AND region_code IS NOT NULL
+    WHERE date_from IS NOT NULL AND region_code IS NOT NULL
 ),
-
 price_quarterly_raw AS (
     SELECT
         year,
@@ -23,20 +20,15 @@ price_quarterly_raw AS (
     FROM price_with_quarter
     GROUP BY year, quarter, category_code
 ),
-
 payroll_clean AS (
     SELECT
-        payroll_year    AS year,
+        payroll_year AS year,
         payroll_quarter AS quarter,
         industry_branch_code,
         value
     FROM czechia_payroll
-    WHERE value_type_code = 5958
-      AND calculation_code = 100
-      AND industry_branch_code IS NOT NULL
-      AND value IS NOT NULL
+    WHERE value_type_code = 5958 AND calculation_code = 100 AND industry_branch_code IS NOT NULL AND value IS NOT NULL
 ),
-
 payroll_yearly_avg_branch_raw AS (
     SELECT
         year,
@@ -45,7 +37,6 @@ payroll_yearly_avg_branch_raw AS (
     FROM payroll_clean
     GROUP BY year, industry_branch_code
 ),
-
 payroll_yearly_avg_overall_raw AS (
     SELECT
         year,
@@ -53,7 +44,6 @@ payroll_yearly_avg_overall_raw AS (
     FROM payroll_clean
     GROUP BY year
 ),
-
 price_yearly_by_cat_raw AS (
     SELECT
         year,
@@ -62,31 +52,19 @@ price_yearly_by_cat_raw AS (
     FROM price_quarterly_raw
     GROUP BY year, category_code
 ),
-
 price_yearly_by_cat_yoy_raw AS (
     SELECT
         year,
         category_code,
         avg_price_yearly_raw,
-        LAG(avg_price_yearly_raw) OVER (
-            PARTITION BY category_code ORDER BY year
-        ) AS prev_price_yearly_raw,
+        LAG(avg_price_yearly_raw) OVER (PARTITION BY category_code ORDER BY year) AS prev_price_yearly_raw,
         CASE
-            WHEN LAG(avg_price_yearly_raw) OVER (
-                    PARTITION BY category_code ORDER BY year
-                 ) IS NULL THEN NULL
-            ELSE (
-                (avg_price_yearly_raw - LAG(avg_price_yearly_raw) OVER (
-                        PARTITION BY category_code ORDER BY year
-                     ))
-                / LAG(avg_price_yearly_raw) OVER (
-                        PARTITION BY category_code ORDER BY year
-                     ) * 100
-            )
+            WHEN LAG(avg_price_yearly_raw) OVER (PARTITION BY category_code ORDER BY year) IS NULL THEN NULL
+            ELSE ((avg_price_yearly_raw - LAG(avg_price_yearly_raw) OVER (PARTITION BY category_code ORDER BY year))
+                  / LAG(avg_price_yearly_raw) OVER (PARTITION BY category_code ORDER BY year) * 100)
         END AS price_yoy_raw
     FROM price_yearly_by_cat_raw
 ),
-
 food_and_wage_yearly_raw AS (
     WITH food_year AS (
         SELECT
@@ -103,42 +81,33 @@ food_and_wage_yearly_raw AS (
         LAG(w.avg_wage_yearly_overall_raw) OVER (ORDER BY fy.year) AS prev_wage,
         CASE
             WHEN LAG(fy.avg_food_price_yearly_raw) OVER (ORDER BY fy.year) IS NULL THEN NULL
-            ELSE ((fy.avg_food_price_yearly_raw -
-                  LAG(fy.avg_food_price_yearly_raw) OVER (ORDER BY fy.year))
+            ELSE ((fy.avg_food_price_yearly_raw - LAG(fy.avg_food_price_yearly_raw) OVER (ORDER BY fy.year))
                   / LAG(fy.avg_food_price_yearly_raw) OVER (ORDER BY fy.year) * 100)
         END AS food_yoy_raw,
         CASE
             WHEN LAG(w.avg_wage_yearly_overall_raw) OVER (ORDER BY fy.year) IS NULL THEN NULL
-            ELSE ((w.avg_wage_yearly_overall_raw -
-                  LAG(w.avg_wage_yearly_overall_raw) OVER (ORDER BY fy.year))
+            ELSE ((w.avg_wage_yearly_overall_raw - LAG(w.avg_wage_yearly_overall_raw) OVER (ORDER BY fy.year))
                   / LAG(w.avg_wage_yearly_overall_raw) OVER (ORDER BY fy.year) * 100)
         END AS wage_yoy_raw
     FROM food_year fy
     JOIN payroll_yearly_avg_overall_raw w USING (year)
 )
-
 SELECT
     p.year,
     p.quarter,
-
     p.category_code,
     cpc.name AS category_name,
     (cpc.price_value || ' ' || cpc.price_unit) AS unit_standardized,
-
     ROUND(p.avg_price_raw::numeric, 2) AS avg_price,
-
     b.industry_branch_code,
     ib.name AS industry_branch_name,
-
     ROUND(b.avg_wage_yearly_branch_raw::numeric, 2) AS avg_wage_yearly_branch,
-    ROUND(pyc.avg_price_yearly_raw::numeric, 2)     AS avg_price_yearly,
-    ROUND(pyoy.price_yoy_raw::numeric, 2)          AS price_yoy_percent,
-
+    ROUND(pyc.avg_price_yearly_raw::numeric, 2) AS avg_price_yearly,
+    ROUND(pyoy.price_yoy_raw::numeric, 2) AS price_yoy_percent,
     ROUND(fwy.avg_food_price_yearly_raw::numeric, 2) AS avg_food_price_yearly,
-    ROUND(fwy.food_yoy_raw::numeric, 2)              AS food_yoy_percent,
+    ROUND(fwy.food_yoy_raw::numeric, 2) AS food_yoy_percent,
     ROUND(fwy.avg_wage_yearly_overall_raw::numeric, 2) AS avg_wage_yearly_overall,
-    ROUND(fwy.wage_yoy_raw::numeric, 2)                AS wage_yoy_percent
-
+    ROUND(fwy.wage_yoy_raw::numeric, 2) AS wage_yoy_percent
 FROM price_quarterly_raw p
 JOIN payroll_yearly_avg_branch_raw b ON p.year = b.year
 LEFT JOIN czechia_price_category cpc ON p.category_code::text = cpc.code::text
@@ -154,6 +123,5 @@ ALTER TABLE data_academy_content.t_michaela_ticha_project_sql_primary_final
     ADD COLUMN is_milk BOOLEAN;
 
 UPDATE data_academy_content.t_michaela_ticha_project_sql_primary_final
-SET
-    is_bread = (category_code = 111301),
-    is_milk  = (category_code = 114201);
+SET is_bread = (category_code = 111301),
+    is_milk = (category_code = 114201);
