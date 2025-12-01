@@ -5,7 +5,7 @@
 
 ## Přehled obsahu repozitáře
 - **Úvodní dokument  a popis mezivýsledků**
-1. PRUVODNILISTINA.md
+1. pruvodni_listina.md
 - **SQL skripty**
 1. SQL_script_primary_final - SQL skript generující [tuto](https://github.com/tichaelam/projekt_z_SQL/blob/main/t_michaela_ticha_project_sql_primary_final.csv) tabulku
 2. SQL_script_secondary_final - SQL skript generující [tuto](https://github.com/tichaelam/projekt_z_SQL/blob/main/t_michaela_ticha_project_sql_secondary_final.csv) tabulku
